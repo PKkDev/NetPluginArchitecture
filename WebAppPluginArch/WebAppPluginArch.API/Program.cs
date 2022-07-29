@@ -1,14 +1,26 @@
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using System.Reflection;
+using System.Runtime.Loader;
+using WebAppPluginArch.API;
 using WebAppPluginArch.Shared;
 
 var builder = WebApplication.CreateBuilder(args);
 
-Assembly assembly = Assembly
-    .LoadFrom(@"D:\work\develops\AngularProjects\bootset-workspace\NetPluginArchitecture\WebAppPluginArch\WebAppPluginArch.PluginOne\bin\Debug\net6.0\WebAppPluginArch.PluginOne.dll");
-var part = new AssemblyPart(assembly);
+var baseDir = AppContext.BaseDirectory;
+
+var pluginLocation = @"D:\work\develops\AngularProjects\bootset-workspace\NetPluginArchitecture\WebAppPluginArch\WebAppPluginArch.PluginOne\bin\Debug\net6.0\WebAppPluginArch.PluginOne.dll";
+
+//Assembly assembly = Assembly.LoadFrom(pluginLocation);
+//AssemblyPart part = new(assembly);
+//builder.Services.AddControllers().PartManager.ApplicationParts.Add(part);
+
+AssemblyLoadContext loadContext = new(pluginLocation);
+// Assembly assembly = loadContext.LoadFromAssemblyName(new AssemblyName(Path.GetFileNameWithoutExtension(pluginLocation)));
+Assembly assembly = loadContext.LoadFromAssemblyPath(pluginLocation);
+AssemblyPart part = new(assembly);
 builder.Services.AddControllers().PartManager.ApplicationParts.Add(part);
+// builder.Services.AddControllersWithViews().AddApplicationPart(assembly);
 
 var atypes = assembly.GetTypes();
 var pluginClass = atypes.SingleOrDefault(t => t.GetInterface(nameof(IPlugin)) != null);
@@ -17,7 +29,8 @@ if (pluginClass != null)
 {
     MethodInfo? initMethod = pluginClass.GetMethod(nameof(IPlugin.Initialize), BindingFlags.Public | BindingFlags.Instance);
     var obj = Activator.CreateInstance(pluginClass);
-    var invokeRes = initMethod?.Invoke(obj, new object[] { builder.Services });
+    Microsoft.Extensions.DependencyInjection.IServiceCollection services = builder.Services;
+    var invokeRes = initMethod?.Invoke(obj, new object[] { services });
 }
 
 // Add services to the container.
